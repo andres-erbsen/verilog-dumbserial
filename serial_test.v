@@ -6,8 +6,11 @@
 
 module testSerial;
     reg sendClock = 0, receiveClock = 0, start = 0;
-    reg [7:0] sendData = 16'b0111011010100101;
-    wire [7:0] receiveData;
+    reg [15:0] sendData = 16'b0111011010100101;
+    wire [7:0] receiveWord;
+    reg [15:0] receiveData = 0;
+    wire [0:0] receiveIndex;
+    wire [0:0] sendIndex;
     wire serialClock, serialData, sendReadyAtNext, receiveReady;
 
     always begin
@@ -15,21 +18,30 @@ module testSerial;
         #7 sendClock <= !sendClock;
     end
 
-    sendFrame #(8) sendFrame(sendClock, start, sendData, serialClock, serialData, sendReadyAtNext);
-    receiveFrame #(8) receiveFrame(receiveClock, serialClock, serialData, receiveData, receiveReady);
+    sendFrame #(8) sendFrame(sendClock, start, sendIndex, sendIndex == 0 ? sendData[15:8] : sendData[7:0], serialClock, serialData, sendReadyAtNext);
+    receiveFrame #(8) receiveFrame(.clock(receiveClock), .serialClock(serialClock), .serialData(serialData), .data(receiveWord), .ready(receiveReady), .index(receiveIndex));
 
     initial begin
         $dumpfile("serial.vcd");
-        $dumpvars(1, sendClock, receiveClock, serialClock, serialData, receiveReady, receiveData);
-        #40 start = 1;
-        #20 start = 0;
+        $dumpvars(1, sendClock, receiveClock, serialClock, serialData, receiveReady, receiveWord, receiveData, sendIndex, receiveIndex, sendReadyAtNext);
+    end
+
+    always @(posedge sendClock) begin
+        if (sendReadyAtNext) begin
+            #400
+            start <= 1;
+            sendData <= sendData + 1;
+        end
+        if (start) start <= 0;
     end
 
     always @(posedge receiveClock) begin
+        if (receiveIndex == 0) receiveData[15:8] = receiveWord;
+        if (receiveIndex == 1) receiveData [7:0] = receiveWord;
         if (receiveReady) begin
             $display("0b%b ==\n0b%b", receiveData, sendData);
             `assert(receiveData === sendData)
-            $finish;
+            #20000 $finish;
         end
     end
 endmodule
