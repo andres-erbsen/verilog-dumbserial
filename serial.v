@@ -1,9 +1,11 @@
 `default_nettype none
 // vim: set ft=verilog ts=4 sw=4 et:
 
-`define START_FRAME_DELIMITER 64'haaaaaaaaaaaaaaab
+`define START_FRAME_DELIMITER 8'haaaaaaaaaaaaaaab
+`define START_FRAME_DELIMITER_BITS 8
 `define HIGH_CYCLES 8
 `define LOW_CYCLES 8
+`define CYCLE_COUNTER_WIDTH 5
 // HIGH_CYCLES >= HIGH_CYCLES_READ > HIGH_CYCLES/2
 `define HIGH_CYCLES_READ 6
 
@@ -12,7 +14,7 @@ module sendBit(input wire clock,
                input wire data,
                output wire serialClock, serialData,
                output wire readyAtNext);
-    reg [$bits(`HIGH_CYCLES+`LOW_CYCLES+1):0] count = 0;
+    reg [`CYCLE_COUNTER_WIDTH-1:0] count = 0;
     always @(posedge clock) begin 
         if (start) count <= `HIGH_CYCLES + `LOW_CYCLES - 1;
         else if (count != 0) count <= count - 1;
@@ -30,7 +32,7 @@ module receiveBit(input wire clock, serialClock, serialData,
         if (&serialClockHistory) begin
             ready <= 1;
             data <= serialData;
-            serialClockHistory <= 0;
+            serialClockHistory = 0;
         end
         if (ready) ready <= 0;
     end
@@ -42,13 +44,13 @@ module sendFrame #(parameter WIDTH=16)
                 output wire serialClock, serialData,
                 output reg readyAtNext = 0);
     reg startBit = 0;
-    reg [$bits($bits(`START_FRAME_DELIMITER)+WIDTH-1)-1:0] i = 0;
+    reg [15:0] i = 0;
     wire bitReadyAtNext;
-    wire [$bits(`START_FRAME_DELIMITER)+WIDTH-1:0] frame = {`START_FRAME_DELIMITER, data};
+    wire [`START_FRAME_DELIMITER_BITS+WIDTH-1:0] frame = {`START_FRAME_DELIMITER, data};
     sendBit sendBit(clock, startBit, frame[i], serialClock, serialData, bitReadyAtNext);
     always @(posedge clock) begin
         if (start) begin
-            i <= $bits(`START_FRAME_DELIMITER)+WIDTH-1;
+            i <= `START_FRAME_DELIMITER_BITS+WIDTH-1;
             startBit <= 1;
         end
         if (i >= 1 && bitReadyAtNext) begin
@@ -63,16 +65,18 @@ module receiveFrame #(parameter WIDTH=16)
                 (input wire clock,
                 input wire serialClock, serialData,
                 output reg [WIDTH-1:0] data,
-                output reg ready = 0);
+                output reg ready = 0, output reg [15:0] i = WIDTH-1);
     reg receiving = 0; // 1:receiving 0:seeking
-    reg [63:0] seekBuffer = 0;
-    reg [$bits(WIDTH-1)-1:0] i = 15;
+    reg [`START_FRAME_DELIMITER_BITS-1:0] seekBuffer = 0;
     wire receiveReady, receiveData;
     receiveBit receive(clock, serialClock, serialData, receiveReady, receiveData);
     always @(posedge clock) begin
         if (!receiving && receiveReady) begin
             seekBuffer = {seekBuffer, receiveData};
-            if (seekBuffer == `START_FRAME_DELIMITER) receiving <= 1;
+            if (seekBuffer == `START_FRAME_DELIMITER) begin
+					receiving <= 1;
+					i <= WIDTH-1;
+				end
         end else if (receiving && receiveReady) begin
             data[i] <= receiveData;
             if (i != 0) i <= i - 1;

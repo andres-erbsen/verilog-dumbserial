@@ -6,8 +6,8 @@
 
 module testSerial;
     reg sendClock = 0, receiveClock = 0, start = 0;
-    reg [15:0] sendData = 16'b0111011010100101;
-    wire [15:0] receiveData;
+    reg [7:0] sendData = 16'b0111011010100101;
+    wire [7:0] receiveData;
     wire serialClock, serialData, sendReadyAtNext, receiveReady;
 
     always begin
@@ -15,12 +15,12 @@ module testSerial;
         #7 sendClock <= !sendClock;
     end
 
-    sendFrame sendFrame(sendClock, start, sendData, serialClock, serialData, sendReadyAtNext);
-    receiveFrame receiveFrame(receiveClock, serialClock, serialData, receiveData, receiveReady);
+    sendFrame #(8) sendFrame(sendClock, start, sendData, serialClock, serialData, sendReadyAtNext);
+    receiveFrame #(8) receiveFrame(receiveClock, serialClock, serialData, receiveData, receiveReady);
 
     initial begin
         $dumpfile("serial.vcd");
-        $dumpvars(1, sendClock, receiveClock, serialClock, serialData);
+        $dumpvars(1, sendClock, receiveClock, serialClock, serialData, receiveReady, receiveData);
         #40 start = 1;
         #20 start = 0;
     end
