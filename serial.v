@@ -76,6 +76,7 @@ module receiveFrame #(parameter WIDTH=16, LOGSIZE=1)
                 input wire serialClock, serialData,
                 output reg [WIDTH-1:0] data=0,
                 output reg ready = 0,
+                output reg sampleReady = 0,
                 output reg [LOGSIZE-1:0] index = 0,
                 output reg [15:0] i = WIDTH-1);
     reg receiving = 0; // 1:receiving 0:seeking
@@ -93,6 +94,7 @@ module receiveFrame #(parameter WIDTH=16, LOGSIZE=1)
             end
         end else if (receiving && receiveReady) begin
             data[i] <= receiveData;
+            if (i == 1) sampleReady <= 1;
             if (i != 0) i <= i - 1;
             else begin
                 i <= WIDTH-1;
@@ -105,6 +107,7 @@ module receiveFrame #(parameter WIDTH=16, LOGSIZE=1)
             end
         end
         if (ready) ready <= 0;
+        if (sampleReady) sampleReady <= 0;
     end
 endmodule
 
