@@ -96,7 +96,7 @@ module receiveFrame #(parameter WIDTH=16, LOGSIZE=1)
             data[i] <= receiveData;
             if (i != 0) i <= i - 1;
             else begin
-					 sampleReady <= 1;
+				sampleReady <= 1;
                 i <= WIDTH-1;
                 index <= index + 1;
                 if (index == {LOGSIZE{1'b1}} - 1) begin // end of packet
