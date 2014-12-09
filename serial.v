@@ -1,7 +1,7 @@
 `default_nettype none
 // vim: set ft=verilog ts=4 sw=4 et:
 
-`define START_FRAME_DELIMITER 8'haaaaaaaaaaaaaaab
+`define START_FRAME_DELIMITER 8'hAB
 `define START_FRAME_DELIMITER_BITS 8
 `define HIGH_CYCLES 8
 `define LOW_CYCLES 8
@@ -80,29 +80,28 @@ module receiveFrame #(parameter WIDTH=16, LOGSIZE=1)
                 output reg [LOGSIZE-1:0] index = 0,
                 output reg [15:0] i = WIDTH-1);
     reg receiving = 0; // 1:receiving 0:seeking
-    reg [`START_FRAME_DELIMITER_BITS-1:0] seekBuffer = 0;
+    reg [6:0] seekBuffer = 0;
     wire receiveReady, receiveData;
     receiveBit receive(clock, serialClock, serialData, receiveReady, receiveData);
     always @(posedge clock) begin
         if (!receiving && receiveReady) begin
-            seekBuffer = {seekBuffer, receiveData};
-            if (seekBuffer == `START_FRAME_DELIMITER) begin
+            seekBuffer <= {seekBuffer[6:0], receiveData};
+            if ({seekBuffer[6:0], receiveData} == `START_FRAME_DELIMITER) begin
                 receiving <= 1;
-                seekBuffer = 0;
+                seekBuffer <= 0;
                 i <= WIDTH-1;
-                index <= 0;
+                index <= {LOGSIZE{1'b1}};
             end
         end else if (receiving && receiveReady) begin
             data[i] <= receiveData;
-            if (i == 1) sampleReady <= 1;
             if (i != 0) i <= i - 1;
             else begin
+					 sampleReady <= 1;
                 i <= WIDTH-1;
-                if (&index) begin // end of packet
+                index <= index + 1;
+                if (index == {LOGSIZE{1'b1}} - 1) begin // end of packet
                     ready <= 1;
                     receiving <= 0;
-                end else begin 
-                    index <= index + 1;
                 end
             end
         end
